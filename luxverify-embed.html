@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -11,6 +12,7 @@
     async function loadModel() {
       try {
         const model = await tf.loadLayersModel('https://cdn.jsdelivr.net/gh/fennygx/luxverify-model@main/model.json');
+        console.log('Model loaded successfully');
         return model;
       } catch (err) {
         console.error('Model load error:', err);
@@ -26,19 +28,34 @@
     });
 
     document.getElementById('upload').addEventListener('change', async (e) => {
-      const img = e.target.files[0];
+      console.log('File selected:', e.target.files[0]);
+      const file = e.target.files[0];
+      if (!file) {
+        document.getElementById('output').innerHTML = 'No file selected.';
+        return;
+      }
       if (!model) {
         document.getElementById('output').innerHTML = 'Model not loaded yet...';
         return;
       }
-      const tensor = tf.browser.fromPixels(img).resizeNearestNeighbor([224, 224]).toFloat().div(255).expandDims();
-      try {
-        const prediction = await model.predict(tensor).dataSync();
-        const confidence = Math.max(...prediction) * 100;
-        document.getElementById('output').innerHTML = `Confidence: ${confidence.toFixed(2)}% Replica`;
-      } catch (err) {
-        document.getElementById('output').innerHTML = 'Error processing image.';
-      }
+
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = async () => {
+        try {
+          const tensor = tf.browser.fromPixels(img).resizeNearestNeighbor([224, 224]).toFloat().div(255).expandDims();
+          const prediction = await model.predict(tensor).dataSync();
+          const confidence = Math.max(...prediction) * 100;
+          document.getElementById('output').innerHTML = `Confidence: ${confidence.toFixed(2)}% Replica`;
+        } catch (err) {
+          console.error('Prediction error:', err);
+          document.getElementById('output').innerHTML = 'Error processing image.';
+        }
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = () => {
+        document.getElementById('output').innerHTML = 'Error loading image.';
+      };
     });
   </script>
 </body>
