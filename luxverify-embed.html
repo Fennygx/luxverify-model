@@ -1,62 +1,51 @@
 
-<!DOCTYPE html>
-<html>
-<head>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-  <title>LuxVerify Beta</title>
-</head>
-<body>
-  <input type="file" id="upload" accept="image/*">
-  <div id="output"></div>
-  <script>
-    async function loadModel() {
-      try {
-        const model = await tf.loadLayersModel('https://cdn.jsdelivr.net/gh/fennygx/luxverify-model@main/model.json');
-        console.log('Model loaded successfully');
-        return model;
-      } catch (err) {
-        console.error('Model load error:', err);
-        document.getElementById('output').innerHTML = 'Error loading model. Try again later.';
-        return null;
-      }
+<script>
+  async function loadModel() {
+    try {
+      const model = await tf.loadLayersModel('https://cdn.jsdelivr.net/gh/fennygx/luxverify-model@main/model.json');
+      console.log('Model loaded successfully');
+      return model;
+    } catch (err) {
+      console.error('Model load error:', err);
+      document.getElementById('output').innerHTML = 'Error loading model. Try again later.';
+      return null;
+    }
+  }
+
+  let model;
+  loadModel().then(loadedModel => {
+    model = loadedModel;
+    if (model) document.getElementById('output').innerHTML = 'Model loaded. Upload an image to start.';
+  });
+
+  document.getElementById('upload').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) {
+      document.getElementById('output').innerHTML = 'No file selected.';
+      return;
+    }
+    if (!model) {
+      document.getElementById('output').innerHTML = 'Model not loaded yet...';
+      return;
     }
 
-    let model;
-    loadModel().then(loadedModel => {
-      model = loadedModel;
-      if (model) document.getElementById('output').innerHTML = 'Model loaded. Upload an image to start.';
-    });
-
-    document.getElementById('upload').addEventListener('change', async (e) => {
-      console.log('File selected:', e.target.files[0]);
-      const file = e.target.files[0];
-      if (!file) {
-        document.getElementById('output').innerHTML = 'No file selected.';
-        return;
+    // Create an image from the file
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    img.onload = async () => {
+      try {
+        const tensor = tf.browser.fromPixels(img).resizeNearestNeighbor([224, 224]).toFloat().div(255).expandDims();
+        const prediction = await model.predict(tensor).dataSync();
+        const confidence = Math.max(...prediction) * 100;
+        document.getElementById('output').innerHTML = `Confidence: ${confidence.toFixed(2)}% Replica`;
+      } catch (err) {
+        console.error('Prediction error:', err);
+        document.getElementById('output').innerHTML = 'Error processing image.';
       }
-      if (!model) {
-        document.getElementById('output').innerHTML = 'Model not loaded yet...';
-        return;
-      }
-
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-      img.onload = async () => {
-        try {
-          const tensor = tf.browser.fromPixels(img).resizeNearestNeighbor([224, 224]).toFloat().div(255).expandDims();
-          const prediction = await model.predict(tensor).dataSync();
-          const confidence = Math.max(...prediction) * 100;
-          document.getElementById('output').innerHTML = `Confidence: ${confidence.toFixed(2)}% Replica`;
-        } catch (err) {
-          console.error('Prediction error:', err);
-          document.getElementById('output').innerHTML = 'Error processing image.';
-        }
-        URL.revokeObjectURL(img.src);
-      };
-      img.onerror = () => {
-        document.getElementById('output').innerHTML = 'Error loading image.';
-      };
-    });
-  </script>
-</body>
-</html>
+      URL.revokeObjectURL(img.src); // Clean up
+    };
+    img.onerror = () => {
+      document.getElementById('output').innerHTML = 'Error loading image.';
+    };
+  });
+</script>
