@@ -1,62 +1,30 @@
-<script>
-  async function loadModel() {
-    try {
-      const model = await tf.loadLayersModel('https://cdn.jsdelivr.net/gh/fennygx/luxverify-model@main/model.json');
-      console.log('Model loaded successfully');
-      return model;
-    } catch (err) {
-      console.error('Model load error:', err);
-      document.getElementById('output').innerHTML = 'Error loading model. Try again later.';
-      return null;
-    }
-  }
+name: Deploy to GitHub Pages
 
-  let model;
-  loadModel().then(loadedModel => {
-    model = loadedModel;
-    if (model) document.getElementById('output').innerHTML = 'Model loaded. Upload an image to start.';
-  });
+on:
+  push:
+    branches:
+      - main
 
-  document.getElementById('upload').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) {
-      document.getElementById('output').innerHTML = 'No file selected.';
-      return;
-    }
-    if (!model) {
-      document.getElementById('output').innerHTML = 'Model not loaded yet...';
-      return;
-    }
+permissions:
+  id-token: write
+  contents: read
+  pages: write
 
-    console.log('File selected:', file.name, 'Type:', file.type);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const img = new Image();
-      img.onload = async () => {
-        try {
-          const tensor = tf.browser.fromPixels(img)
-            .resizeNearestNeighbor([224, 224]) // Match your model's input size
-            .toFloat()
-            .div(255.0)
-            .expandDims();
-          const prediction = await model.predict(tensor).dataSync();
-          const confidence = Math.max(...prediction) * 100;
-          document.getElementById('output').innerHTML = `Confidence: ${confidence.toFixed(2)}% Replica`;
-        } catch (err) {
-          console.error('Prediction error:', err);
-          document.getElementById('output').innerHTML = 'Error processing image. Check console for details.';
-        }
-      };
-      img.onerror = () => {
-        console.error('Image load failed');
-        document.getElementById('output').innerHTML = 'Error loading image. Ensure it’s a valid image file.';
-      };
-      img.src = event.target.result; // data URL from reader
-    };
-    reader.onerror = () => {
-      console.error('File read failed');
-      document.getElementById('output').innerHTML = 'Error reading file. Try a different image.';
-    };
-    reader.readAsDataURL(file);
-  });
-</script>
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Pages
+        run: |
+          mkdir -p public
+          cp -r * public/  # Copy all files to public folder
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-pages
+          path: public
+      - uses: actions/deploy-pages@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifact-name: github-pages
