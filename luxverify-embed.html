@@ -11,14 +11,14 @@ permissions:
   pages: write
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Pages
+      - name: Build Artifact
         run: |
           mkdir -p public
-          cp -r * public/  # Copy all files to public folder
+          cp luxverify-embed.html public/ # Copy your HTML file
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -27,4 +27,8 @@ jobs:
       - uses: actions/deploy-pages@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          artifact-name: github-pages
+          timeout: 600000
+          error_count: 10
+          reporting_interval: 5000
+          artifact_name: github-pages
+          preview: false
