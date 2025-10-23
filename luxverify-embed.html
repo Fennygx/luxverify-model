@@ -1,4 +1,3 @@
-
 <script>
   async function loadModel() {
     try {
@@ -29,23 +28,35 @@
       return;
     }
 
-    // Create an image from the file
-    const img = new Image();
-    img.src = URL.createObjectURL(file);
-    img.onload = async () => {
-      try {
-        const tensor = tf.browser.fromPixels(img).resizeNearestNeighbor([224, 224]).toFloat().div(255).expandDims();
-        const prediction = await model.predict(tensor).dataSync();
-        const confidence = Math.max(...prediction) * 100;
-        document.getElementById('output').innerHTML = `Confidence: ${confidence.toFixed(2)}% Replica`;
-      } catch (err) {
-        console.error('Prediction error:', err);
-        document.getElementById('output').innerHTML = 'Error processing image.';
-      }
-      URL.revokeObjectURL(img.src); // Clean up
+    console.log('File selected:', file.name, 'Type:', file.type);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const img = new Image();
+      img.onload = async () => {
+        try {
+          const tensor = tf.browser.fromPixels(img)
+            .resizeNearestNeighbor([224, 224]) // Match your model's input size
+            .toFloat()
+            .div(255.0)
+            .expandDims();
+          const prediction = await model.predict(tensor).dataSync();
+          const confidence = Math.max(...prediction) * 100;
+          document.getElementById('output').innerHTML = `Confidence: ${confidence.toFixed(2)}% Replica`;
+        } catch (err) {
+          console.error('Prediction error:', err);
+          document.getElementById('output').innerHTML = 'Error processing image. Check console for details.';
+        }
+      };
+      img.onerror = () => {
+        console.error('Image load failed');
+        document.getElementById('output').innerHTML = 'Error loading image. Ensure it’s a valid image file.';
+      };
+      img.src = event.target.result; // data URL from reader
     };
-    img.onerror = () => {
-      document.getElementById('output').innerHTML = 'Error loading image.';
+    reader.onerror = () => {
+      console.error('File read failed');
+      document.getElementById('output').innerHTML = 'Error reading file. Try a different image.';
     };
+    reader.readAsDataURL(file);
   });
 </script>
