@@ -1,34 +1,56 @@
-name: Deploy to GitHub Pages
+<script>
+  async function loadModel() {
+    try {
+      const model = await tf.loadLayersModel('https://cdn.jsdelivr.net/gh/fennygx/luxverify-model@main/model.json');
+      console.log('Model loaded successfully');
+      return model;
+    } catch (err) {
+      console.error('Model load error:', err);
+      document.getElementById('output').innerHTML = 'Error loading model. Try again later.';
+      return null;
+    }
+  }
 
-on:
-  push:
-    branches:
-      - main
+  let model;
+  loadModel().then(loadedModel => {
+    model = loadedModel;
+    if (model) document.getElementById('output').innerHTML = 'Model loaded. Upload an image to start.';
+  });
 
-permissions:
-  id-token: write
-  contents: read
-  pages: write
+  document.getElementById('upload').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) {
+      document.getElementById('output').innerHTML = 'No file selected.';
+      return;
+    }
+    if (!model) {
+      document.getElementById('output').innerHTML = 'Model not loaded yet...';
+      return;
+    }
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build Artifact
-        run: |
-          mkdir -p public
-          cp luxverify-embed.html public/ # Copy your HTML file
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: github-pages
-          path: public
-      - uses: actions/deploy-pages@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          timeout: 600000
-          error_count: 10
-          reporting_interval: 5000
-          artifact_name: github-pages
-          preview: false
+    console.log('File selected:', file.name);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const img = new Image();
+      img.onload = async () => {
+        try {
+          const tensor = tf.browser.fromPixels(img).resizeNearestNeighbor([224, 224]).toFloat().div(255).expandDims();
+          const prediction = await model.predict(tensor).dataSync();
+          const confidence = Math.max(...prediction) * 100;
+          document.getElementById('output').innerHTML = `Confidence: ${confidence.toFixed(2)}% Replica`;
+        } catch (err) {
+          console.error('Prediction error:', err);
+          document.getElementById('output').innerHTML = 'Error processing image.';
+        }
+      };
+      img.onerror = () => {
+        document.getElementById('output').innerHTML = 'Error loading image.';
+      };
+      img.src = event.target.result; // data URL from reader
+    };
+    reader.onerror = () => {
+      document.getElementById('output').innerHTML = 'Error reading file.';
+    };
+    reader.readAsDataURL(file);
+  });
+</script>
